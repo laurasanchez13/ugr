@@ -38,4 +38,3 @@ codigo ends
 END main
 ```
 
-![Captura](Captura.png "Demostración")
