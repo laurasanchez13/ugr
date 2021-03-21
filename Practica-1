@@ -1,1 +1,276 @@
+// Laura Sánchez Sánchez
+
+#include <stdio.h>
+#include <dos.h>
+
+int ALTO = 25;
+int ANCHO = 80;
+int FG_COLOR = 0;
+int BG_COLOR = 1;
+int full_screen = 80 * 25 * 2;
+
+// Coloca el cursor en una posición determinada
+void gotoxy(int fila, int columna)
+{
+	union REGS inregs, outregs;
+
+	inregs.h.ah = 0x02;
+	inregs.h.dl = columna;
+	inregs.h.dh = fila;
+	inregs.h.bh = 0x00;
+
+	int86(0x10, &inregs, &outregs);
+}
+
+// Fijar el aspecto del cursor, debe admitir tres valores: INVISIBLE, NORMAL y GRUESO
+void setcursortype(int tipo_cursor)
+{
+	union REGS inregs, outregs;
+	inregs.h.ah = 0x01;
+	switch (tipo_cursor)
+	{
+	case 0: //invisible
+		inregs.h.ch = 010;
+		inregs.h.cl = 000;
+		break;
+	case 1: //normal
+		inregs.h.ch = 010;
+		inregs.h.cl = 010;
+		break;
+	case 2: //grueso
+		inregs.h.ch = 000;
+		inregs.h.cl = 010;
+		break;
+	}
+	int86(0x10, &inregs, &outregs);
+}
+
+// Fija el modo de video deseado
+void setvideomode(int modo)
+{
+	union REGS inregs, outregs;
+
+	inregs.h.al = modo;
+	inregs.h.ah = 0x00;
+
+	int86(0x10, &inregs, &outregs);
+}
+
+// Obtiene el modo de video actual
+int getvideomode()
+{
+	union REGS inregs, outregs;
+
+	inregs.h.ah = 0xF;
+
+	int86(0x10, &inregs, &outregs);
+
+	return outregs.h.al;
+}
+
+// Modifica el color de primer plano con que se mostrarán los caracteres
+void textcolor(int color)
+{
+	FG_COLOR = color;
+}
+
+// Modifica el color de fondo con que se mostrarán los caracteres
+void textbackground(int color)
+{
+	BG_COLOR = color;
+}
+
+// Borra toda la pantalla
+// Hago scrollup
+void clrscr()
+{
+	union REGS inregs, outregs;
+	int color = (BG_COLOR << 4) | FG_COLOR;
+
+	inregs.h.ah = 0x06;
+	inregs.h.al = ALTO + 1;
+	inregs.h.bh = color;
+	inregs.h.ch = 0;
+	inregs.h.cl = 0;
+	inregs.h.dh = ALTO;
+	inregs.h.dl = ANCHO;
+
+	int86(0x10, &inregs, &outregs);
+}
+
+// Escribe un carácter en pantalla con el color indicado actualmente
+void mi_cputchar(char c)
+{
+	union REGS inregs, outregs;
+
+	inregs.h.ah = 2;
+	inregs.h.dl = c;
+	inregs.h.bl = (BG_COLOR << 4) | FG_COLOR;
+	inregs.h.bh = 0x00;
+	inregs.x.cx = 1;
+
+	int86(0x10, &inregs, &outregs);
+}
+
+// Funcion que usare para getche()
+int mi_getchar()
+{
+	union REGS inregs, outregs;
+	int caracter;
+
+	inregs.h.ah = 1;
+	int86(0x21, &inregs, &outregs);
+
+	caracter = outregs.h.al;
+	return caracter;
+}
+
+/*
+Leer	un	carácter	desde	el	teclado	
+Número	de	interrupción:	16h	
+Número	de	función:	0	
+Entrada:	AH	=	0	
+Salida:	AL:	código	ASCII	de	la	tecla	pulsada	
+AH:	BIOS	SCAN	CODE	de	la	tecla	pulsada	
+
+int mi_getcaracter()
+{
+	union REGS inregs, outregs;
+	int caracter;
+
+	inregs.h.ah = 0x00;
+
+	int86(0x16, &inregs, &outregs);
+
+	caracter = outregs.h.al;
+	return caracter;
+}
+*/
+
+// Obtiene un carácter de teclado y lo muestra en pantalla
+void getche()
+{
+	int caracter;
+	char c;
+	union REGS inregs, outregs;
+	caracter = mi_getchar();
+
+	c = (char)caracter;
+
+	inregs.h.ah = 2;
+	inregs.h.dl = c;
+
+	int86(0x21, &inregs, &outregs);
+}
+
+// Pintamos el caracter con los colores de fondo y texto que queramos
+void mi_putchar_color(unsigned char cfondo, unsigned char ctexto, char letra)
+{
+	union REGS inregs, outregs;
+
+	inregs.h.ah = 0x09;
+	inregs.h.al = letra;
+	inregs.h.bl = (cfondo << 4) | ctexto;
+	inregs.h.bh = 0x00;
+	inregs.x.cx = 1;
+
+	int86(0x10, &inregs, &outregs);
+	return;
+}
+
+// Adicional
+// Ponemos color de texto y de fondo del tirón
+void colorFondocolorTexto()
+{
+	int i;
+	char far *scrn;
+	short int attribute;
+	
+	attribute = 65;
+	i = 0;
+	scrn = (char far *)0xB8000000;
+
+	for (i = 0; i < full_screen; i += 2)
+	{
+		scrn[i] = 'L';
+		scrn[i + 1] = attribute;
+	}
+}
+
+void mi_pausa()
+{
+	union REGS inregs, outregs;
+	inregs.h.ah = 0x00;
+	int86(0x16, &inregs, &outregs);
+}
+
+int main()
+{
+	int modovideo;
+
+	clrscr();
+
+	printf("\nFUNCION 1 - gotoxy(): Posicion (20,70) ");
+	gotoxy(20, 70);
+	mi_pausa();
+
+	printf("\nFUNCION 2 - setcursortype(): ");
+	printf("\nCursor invisible: ");
+	setcursortype(0);
+	mi_pausa();
+	printf("\nCursor grueso: ");
+	setcursortype(2);
+	mi_pausa();
+	printf("\nCursor normal: ");
+	setcursortype(1);
+	mi_pausa();
+
+	printf("\nFUNCION 3 - setvideomode(): ");
+
+	setvideomode(0);
+	mi_pausa();
+
+	/*
+	printf("\nResolucion 80x25 con 16 colores: ");
+	setvideomode(3);
+	mi_pausa();
+	printf("\nResolucion 80x25 con 2 colores: ");
+	setvideomode(7);
+	mi_pausa();
+	*/
+
+	printf("\nResolucion 40x25 con 16 colores: ");
+	printf("\nFUNCION 4 - getvideomode(): ");
+	modovideo = getvideomode();
+	printf("\n");
+
+	printf("\nFUNCION 5 - textcolor(): texto blanco y fondo azul");
+	textcolor(15);
+	textbackground(1);
+	printf("\n");
+
+	mi_putchar_color(FG_COLOR, BG_COLOR, 'A');
+	printf("\n");
+	mi_pausa();
+
+	printf("\nFUNCION 6 - clrscr(): ");
+	clrscr();
+	mi_pausa();
+
+	printf("\nAcabamos de limpiar la pantalla. ");
+	printf("\nFUNCION 7 - mi_putchar_color(): esta funcion recoge a varias!!! ");
+	mi_putchar_color(FG_COLOR, BG_COLOR, 'A');
+	mi_pausa();
+
+	printf("\nFUNCION 8 - getche(): Introduce una letra: ");
+	getche();
+	mi_pausa();
+
+	printf("\nFUNCION Extra: llenar la pantalla: ");
+
+	colorFondocolorTexto();
+	mi_pausa();
+	printf("\n");
+	return 0;
+}
 
