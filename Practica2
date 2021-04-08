@@ -1,0 +1,97 @@
+
+//  gcc rebota2.c -o rebota2 -lncurses
+
+#include <ncurses.h>
+#include <unistd.h>
+
+#define DELAY 80000
+
+int main(int argc, char *argv[])
+{
+    int x = 5, y = 0;
+    int max_y = 25, max_x = 80;
+    int next_x = 0;
+    int directionx = 1;
+    int next_y = 0;
+    int directiony = 1;
+
+    int xc = 20, yc = 20;
+    int ch = 0;
+
+    initscr();
+    noecho();
+    cbreak();
+    curs_set(FALSE);
+    nodelay(stdscr, TRUE);
+    start_color();
+    init_pair(3, COLOR_WHITE, COLOR_BLUE);
+    WINDOW *window = newwin(max_y, max_x, 0, 0);
+    wbkgd(window, COLOR_PAIR(3));
+    clear();
+
+    while (1)
+    {
+        // Para que podamos redimensionar la pantalla en ejecución y no haya problemas
+        getmaxyx(stdscr, max_y, max_x);
+        clear();
+        mvprintw(y, x, "O");
+        mvprintw(yc, xc, "___");
+        refresh();
+
+        // Cogemos la tecla que hemos pulsado
+        ch = getch();
+
+        //Si pulsamos la o
+        if (ch == 'o' && xc > 0)
+        {
+            xc -= 1;
+        }
+
+        // Si pulsamos la p. Pongo "-3" porque tenemos 3 guiones como barra
+        else if (ch == 'p' && xc < max_x - 3)
+        {
+            xc += 1;
+        }
+
+        usleep(DELAY);
+
+        next_x = x + directionx;
+        next_y = y + directiony;
+
+        if (next_x >= max_x || next_x < 0)
+        {
+            directionx *= -1;
+        }
+        else
+        {
+            x += directionx;
+        }
+
+        //Si choca por arriba
+        if (next_y < 0)
+        {
+            directiony *= -1;
+        }
+        else
+        {
+            // Si choca con nosotros
+            if ((x == xc + 1 || x == xc + 2 || x == xc + 3) && next_y == 20)
+            {
+                directiony *= -1;
+            }
+            //Si hemos perdido
+            else if (next_y > 20)
+            {
+                mvprintw(12, 30, "GAME OVER");
+                refresh();
+                usleep(1200000);
+                endwin();
+                return 0;
+            }
+            else
+                y += directiony;
+        }
+    }
+
+    endwin();
+}
